@@ -6,11 +6,6 @@ image_cli="${CODEX_IMAGEGEN_CLI:-$HOME/.codex/skills/.system/imagegen/scripts/im
 python_bin="${CODEX_IMAGEGEN_PYTHON:-$HOME/.codex/skills/configured-imagegen/.venv/bin/python}"
 model="${CODEX_IMAGEGEN_MODEL:-gpt-image-2}"
 
-if [ ! -r "$config_path" ]; then
-  printf '%s\n' "Error: Codex configuration is not readable: $config_path" >&2
-  exit 1
-fi
-
 if [ ! -f "$image_cli" ]; then
   printf '%s\n' "Error: bundled image generator is not available: $image_cli" >&2
   exit 1
@@ -22,6 +17,10 @@ if [ ! -x "$python_bin" ]; then
 fi
 
 read_provider_value() {
+  if [ ! -r "$config_path" ]; then
+    return 0
+  fi
+
   awk -v target="$1" '
     /^\[model_providers\.OpenAI\][[:space:]]*$/ { in_provider=1; next }
     /^\[/ { in_provider=0 }
@@ -43,11 +42,19 @@ read_provider_value() {
   ' "$config_path"
 }
 
-base_url=$(read_provider_value base_url)
-api_key=$(read_provider_value experimental_bearer_token)
+base_url="${OPENAI_BASE_URL:-}"
+api_key="${OPENAI_API_KEY:-}"
 
-if [ -z "$base_url" ] || [ -z "$api_key" ]; then
-  printf '%s\n' "Error: model_providers.OpenAI.base_url and experimental_bearer_token must be configured." >&2
+if [ -z "$api_key" ]; then
+  api_key=$(read_provider_value experimental_bearer_token)
+fi
+
+if [ -z "$base_url" ]; then
+  base_url=$(read_provider_value base_url)
+fi
+
+if [ -z "$api_key" ]; then
+  printf '%s\n' "Error: set OPENAI_API_KEY or configure model_providers.OpenAI.experimental_bearer_token." >&2
   exit 1
 fi
 
@@ -62,4 +69,8 @@ if [ "$has_model" -eq 0 ]; then
   set -- "$@" --model "$model"
 fi
 
-OPENAI_BASE_URL="$base_url" OPENAI_API_KEY="$api_key" exec "$python_bin" "$image_cli" "$@"
+if [ -n "$base_url" ]; then
+  OPENAI_BASE_URL="$base_url" OPENAI_API_KEY="$api_key" exec "$python_bin" "$image_cli" "$@"
+fi
+
+OPENAI_API_KEY="$api_key" exec "$python_bin" "$image_cli" "$@"
