@@ -14,7 +14,8 @@
 
 1. 使用独立且较新的 OpenAI Python SDK 运行内置 GPT Image CLI；
 2. 优先读取已设置的 `OPENAI_API_KEY` 与 `OPENAI_BASE_URL`；
-3. 根据顶层 `model_provider` 选择 provider，并读取对应配置中的 `experimental_bearer_token`（或 `env_key`）和 `base_url`。
+3. 根据顶层 `model_provider` 选择 provider，并读取对应配置中的 `experimental_bearer_token`（或 `env_key`）和 `base_url`；
+4. 当所选 provider 没有 bearer token 时，回退读取 `~/.codex/auth.json` 顶层的 `OPENAI_API_KEY`。
 
 仓库不包含任何 key。每位使用者必须配置自己的 OpenAI API key 或第三方兼容服务令牌。
 
@@ -78,9 +79,13 @@ env_key = "MY_PROVIDER_API_KEY"
 
 包装脚本只在执行时读取这些字段，不会将它们复制到技能目录或打印到终端。`OPENAI_API_KEY` 和 `OPENAI_BASE_URL` 的优先级高于 provider 配置。
 
+### 方式三：Codex auth 文件回退
+
+当所选 provider 未包含 `experimental_bearer_token` 时，包装器会读取 `${CODEX_AUTH_PATH:-${CODEX_HOME:-$HOME/.codex}/auth.json}` 顶层的 `OPENAI_API_KEY`。它不会读取或挪用 ChatGPT access token。只有这个回退也没有 key 时，才会使用 provider 的 `env_key`。
+
 ### 配置范围
 
-对本技能的 CLI 兜底包装器而言，相关 provider 字段是 `base_url`，以及 `experimental_bearer_token` 或 `env_key` 二者之一。它不会读取 `~/.codex/auth.json`；该文件属于 Codex 自身的登录状态，在 ChatGPT 登录凭据存储于其他位置时，它可能为空。
+对本技能的 CLI 兜底包装器而言，相关 provider 字段是 `base_url`，以及 `experimental_bearer_token` 或 `env_key` 二者之一。对于 `auth.json`，只会使用顶层 `OPENAI_API_KEY` 字段。
 
 包装脚本只使用顶层 `model_provider` 来选择 `model_providers` 下的同名配置表。顶层 `model` 以及 provider 中的 `name`、`wire_api` 等字段仍用于控制 Codex 本身，不参与生图。
 
@@ -123,7 +128,7 @@ CODEX_IMAGEGEN_MODEL="gpt-image-2" \
 | --- | --- |
 | `image_gen` 不可用 | 使用本技能的包装脚本，它就是为该兜底路径设计的。 |
 | 缺少 Python 环境 | 在技能目录中运行 `sh scripts/setup_imagegen_env.sh`，脚本会动态识别实际安装路径。 |
-| `OPENAI_API_KEY` 未设置 | 设置该变量、配置所选 provider 的 token，或设置其 `env_key` 指向的环境变量。 |
+| `OPENAI_API_KEY` 未设置 | 设置该变量、配置所选 provider 的 token、写入 Codex `auth.json`，或设置其 `env_key` 指向的环境变量。 |
 | 选错 provider | 检查顶层 `model_provider`，或用 `CODEX_IMAGEGEN_PROVIDER` 指定目标 provider 表名。 |
 | 认证或模型报错 | 检查服务地址、令牌、余额与服务端对 `gpt-image-2` 的支持。 |
 | 不支持 `output_format` 参数 | 重新运行安装脚本，以安装隔离的新版 OpenAI SDK。 |

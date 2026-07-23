@@ -12,7 +12,8 @@ This skill bridges that gap. It keeps native generation as the first choice, and
 
 1. runs the bundled GPT Image CLI with a current, isolated OpenAI Python SDK;
 2. uses `OPENAI_API_KEY` and `OPENAI_BASE_URL` when they are already set; or
-3. selects the provider named by top-level `model_provider` and reads its `experimental_bearer_token` (or `env_key`) and `base_url` from the local Codex configuration.
+3. selects the provider named by top-level `model_provider` and reads its `experimental_bearer_token` (or `env_key`) and `base_url` from the local Codex configuration; or
+4. falls back to the top-level `OPENAI_API_KEY` in `~/.codex/auth.json` when the selected provider has no bearer token.
 
 The skill never stores a key in the repository. Each user supplies their own OpenAI API key or compatible third-party provider token.
 
@@ -76,9 +77,13 @@ env_key = "MY_PROVIDER_API_KEY"
 
 The wrapper reads these fields only at execution time. It does not copy them into the skill directory or terminal output. `OPENAI_API_KEY` and `OPENAI_BASE_URL` take precedence over provider configuration.
 
+### Option C: Codex auth file fallback
+
+When the selected provider does not contain `experimental_bearer_token`, the wrapper reads the top-level `OPENAI_API_KEY` from `${CODEX_AUTH_PATH:-${CODEX_HOME:-$HOME/.codex}/auth.json}`. It does not read or repurpose ChatGPT access tokens. Provider `env_key` is used only when this fallback also has no key.
+
 ### Configuration Scope
 
-For this skill's fallback wrapper, the relevant provider fields are `base_url` plus either `experimental_bearer_token` or `env_key`. It does not read `~/.codex/auth.json`; that file is part of Codex's own login state and may be empty when ChatGPT authentication is stored elsewhere.
+For this skill's fallback wrapper, the relevant provider fields are `base_url` plus either `experimental_bearer_token` or `env_key`. From `auth.json`, only the top-level `OPENAI_API_KEY` field is used.
 
 The wrapper uses top-level `model_provider` only to select the matching table under `model_providers`. Fields such as top-level `model`, or provider-level `name` and `wire_api`, continue to control Codex itself and are not used for image generation.
 
@@ -121,7 +126,7 @@ An explicit CLI `--model` argument overrides the wrapper default. `gpt-image-2` 
 | --- | --- |
 | `image_gen` is unavailable | Use this skill's wrapper. It is intended for this fallback path. |
 | Python environment is missing | Run `sh scripts/setup_imagegen_env.sh` from the skill directory. The path is discovered dynamically. |
-| `OPENAI_API_KEY` is not set | Export it, configure the selected provider's token, or set the environment variable named by `env_key`. |
+| `OPENAI_API_KEY` is not set | Export it, configure the selected provider's token, add it to Codex `auth.json`, or set the environment variable named by `env_key`. |
 | Wrong provider is selected | Check top-level `model_provider`, or set `CODEX_IMAGEGEN_PROVIDER` to the desired provider table name. |
 | Authentication or model error | Verify the provider URL, token, billing, and support for `gpt-image-2`. |
 | Unsupported `output_format` argument | Re-run the setup script. It installs an isolated current OpenAI SDK. |

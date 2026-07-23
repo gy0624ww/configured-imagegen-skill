@@ -20,7 +20,7 @@ sh "<skill-directory>/scripts/run_imagegen.sh" generate \
 
 The wrapper selects the provider named by top-level `model_provider` in `${CODEX_CONFIG_PATH:-${CODEX_HOME:-$HOME/.codex}/config.toml}`. `CODEX_IMAGEGEN_PROVIDER` overrides that selection. If neither is set, it selects the only configured provider, or uses `OpenAI` as a backward-compatible fallback when that table exists. Never assume the provider is named `OpenAI`.
 
-Use credentials in this order: `OPENAI_API_KEY`; the selected provider's `experimental_bearer_token`; then the environment variable named by its `env_key`. Use `OPENAI_BASE_URL` before the selected provider's `base_url`. The wrapper exposes resolved values only to the image CLI child process. Do not print, copy, persist, or ask the user for a configured token.
+Use credentials in this order: `OPENAI_API_KEY`; the selected provider's `experimental_bearer_token`; `${CODEX_AUTH_PATH:-${CODEX_HOME:-$HOME/.codex}/auth.json}` field `OPENAI_API_KEY`; then the environment variable named by the provider's `env_key`. Use `OPENAI_BASE_URL` before the selected provider's `base_url`. The wrapper exposes resolved values only to the image CLI child process. Do not print, copy, persist, or ask the user for a configured token. Do not use ChatGPT access tokens from `auth.json` as Images API keys.
 
 The wrapper explicitly selects `gpt-image-2` unless a caller supplies `--model` or deliberately sets `CODEX_IMAGEGEN_MODEL` to a verified newer compatible GPT Image model. Pass `edit` and its normal GPT Image CLI arguments for image edits. Keep image prompts and output paths appropriate to the user request. Do not print, copy, persist, or ask the user for the configured token.
 

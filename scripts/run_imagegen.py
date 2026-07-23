@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -27,6 +28,23 @@ def load_config(path: Path) -> dict[str, Any]:
             return tomllib.load(config_file)
     except (OSError, tomllib.TOMLDecodeError) as exc:
         fail(f"cannot read Codex configuration at {path}: {exc}")
+
+
+def load_auth_api_key(path: Path) -> str:
+    if not path.exists():
+        return ""
+    try:
+        with path.open(encoding="utf-8") as auth_file:
+            auth = json.load(auth_file)
+    except (OSError, json.JSONDecodeError) as exc:
+        fail(f"cannot read Codex authentication at {path}: {exc}")
+
+    if not isinstance(auth, dict):
+        fail(f"Codex authentication at {path} must be a JSON object")
+    api_key = auth.get("OPENAI_API_KEY", "")
+    if not isinstance(api_key, str):
+        fail(f"OPENAI_API_KEY in {path} must be a string")
+    return api_key
 
 
 def select_provider(config: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
@@ -58,7 +76,7 @@ def select_provider(config: dict[str, Any]) -> tuple[str | None, dict[str, Any]]
     return requested, provider
 
 
-def configured_credentials(provider: dict[str, Any]) -> tuple[str, str]:
+def configured_credentials(provider: dict[str, Any], auth_path: Path) -> tuple[str, str]:
     api_key = os.environ.get("OPENAI_API_KEY", "")
     base_url = os.environ.get("OPENAI_BASE_URL", "")
 
@@ -66,6 +84,8 @@ def configured_credentials(provider: dict[str, Any]) -> tuple[str, str]:
         token = provider.get("experimental_bearer_token", "")
         if isinstance(token, str):
             api_key = token
+    if not api_key:
+        api_key = load_auth_api_key(auth_path)
     if not api_key:
         env_key = provider.get("env_key", "")
         if isinstance(env_key, str) and env_key:
@@ -86,6 +106,9 @@ def main() -> None:
     config_path = Path(
         os.environ.get("CODEX_CONFIG_PATH", codex_home / "config.toml")
     ).expanduser()
+    auth_path = Path(
+        os.environ.get("CODEX_AUTH_PATH", codex_home / "auth.json")
+    ).expanduser()
     image_cli = Path(
         os.environ.get(
             "CODEX_IMAGEGEN_CLI",
@@ -98,14 +121,14 @@ def main() -> None:
 
     config = load_config(config_path)
     provider_name, provider = select_provider(config)
-    api_key, base_url = configured_credentials(provider)
+    api_key, base_url = configured_credentials(provider, auth_path)
     if not api_key:
         provider_hint = (
             f"model_providers.{provider_name}" if provider_name else "the active model provider"
         )
         fail(
             "set OPENAI_API_KEY, set the provider's env_key variable, or configure "
-            f"{provider_hint}.experimental_bearer_token"
+            f"{provider_hint}.experimental_bearer_token or {auth_path}"
         )
 
     arguments = sys.argv[1:]
